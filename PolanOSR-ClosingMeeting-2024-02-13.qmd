@@ -1,0 +1,697 @@
+---
+title: "Poland’s OSR Feasibility Study Regions’ Overview"
+subtitle: "Comparisons of the Results of each Region from the first Level 2 Feasibility Assessment following the Bayer’s Shelf Product"
+author: Bayer Crop Science
+date: today
+slide-number: c/t
+logo: "https://upload.wikimedia.org/wikipedia/commons/f/f7/Logo_Bayer.svg"
+footer: Feasibility Study for Carbon Farming Practices of OSR in Poland by Bayer Crop Science
+format: 
+  revealjs:
+    theme: theme.scss
+    incremental: true
+    chalkboard: true
+editor: visual
+title-slide-attributes: 
+  data-background-image: bayer.jpg
+  data-background-size: cover
+---
+
+```{r}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(data.table)
+library(readxl)
+library(ggplot2)
+library(gt)
+library(knitr)
+library(tidyverse)
+library(tidyr)
+```
+
+# Reference Scenario Overview {background-image="bayer.jpg"}
+
+## Overview of Climatic Conditions for Each Region
+
+> The table below provides insights into average temperatures, rainfall, and evapotranspiration for each region.
+
+```{r}
+#|label: regions-climate
+#|output-location: column-fragment
+
+climate_files <- list.files("Climate")
+path.split <- vector()
+region.name <- vector()
+
+for (i in 1:length(climate_files)) {
+  
+  path.split[i] <- unlist(strsplit(climate_files[i], split = "_"))[2]
+  
+  region.name[i]  <- unlist(strsplit(path.split[i], "[.]"))[1]
+  
+  bb <- read.csv(paste0("Climate/", climate_files[i]))
+  
+  dd <- cbind(bb, rep(region.name[i], nrow(bb)))
+  names(dd) <- c("Year","Month","tmax.degC.", "tmin.degC.", "ppt.mm.", "aet.mm.","Region" )
+
+  assign(paste0("data", i), dd)
+  
+}
+
+data_all_regions <- rbind(data1,data2,data3,data4,data5)
+
+avgMaxAnnualTemp  <- aggregate(data_all_regions$tmax.degC., list(data_all_regions$Year,data_all_regions$Region), mean)
+
+avgMinAnnualTemp <- aggregate(data_all_regions$tmin.degC., list(data_all_regions$Year,data_all_regions$Region), mean)
+
+total_Annual_ppt <- aggregate(data_all_regions$ppt.mm., list(data_all_regions$Year,data_all_regions$Region), sum)
+
+total_Annual_aet <- aggregate(data_all_regions$aet.mm., list(data_all_regions$Year,data_all_regions$Region), sum)
+
+df_weather_data <- cbind(avgMaxAnnualTemp, avgMinAnnualTemp$x, total_Annual_ppt$x,total_Annual_aet$x)
+
+names(df_weather_data) = c("Year","Region", "MaximumTemperature", "MinimumTemperature",
+                           "AnnualPrecipitation", "AnnualEvapotransporation")
+df_weather_data$AverageAnnualTemperature <- (df_weather_data$MinimumTemperature+df_weather_data$MaximumTemperature)/2
+df_weather_data$Rain <- df_weather_data$AnnualPrecipitation/df_weather_data$AnnualEvapotransporation
+
+df_weather_data_agg <- df_weather_data %>% group_by(Region) %>% 
+  summarise("Max.Temp. (°C)"=mean(MaximumTemperature),
+            "Min. Temp. (°C)"=mean(MinimumTemperature),
+            "Annual PPT (mm)" =mean(AnnualPrecipitation), 
+            "Annual EAT (mm)"=mean(AnnualEvapotransporation),
+            "Avg Temp.(°C)"=mean(AverageAnnualTemperature),
+            "PPT/EAT"= mean(Rain))
+
+
+gt(df_weather_data_agg) %>% fmt_number(decimals = 1) %>% 
+  tab_style(style =   cell_text(color="#195079", size= 48), 
+                         locations = list(cells_body(columns =everything(), rows=everything()),cells_column_labels(columns=everything()))) %>% tab_options(table_body.hlines.color ="#195079")
+```
+
+## Overview of Reference Scenario Conditions for Each Region
+
+> The table below presents comprehensive data from the feasibility study, including average sand content, clay content, total area under consideration, fertilizer rates, and regional yields
+
+```{r}
+allfiles <- list.files("Data-input")
+
+df <- data.frame(matrix(nrow=length(allfiles), ncol=7))
+
+names(df) <- c("Grower", "Region", "Sand", "Clay","Total Area" ,"Fertilizer Amount", "Yield")
+
+for (i in 1:length(allfiles)){
+  
+  file_name <- allfiles[i]
+  
+  sheet_names <- excel_sheets(paste0("Data-input/", file_name))
+  
+  unlist_filename <- unlist(strsplit(file_name, "_"))[4]
+  
+  df[i,1] <- strsplit(unlist_filename,".xlsx")
+
+  wasp <- vector()
+  casp <- vector()
+  pasp <- vector()
+  sand_content <- vector()
+  clay_content <- vector()
+  
+  for(s in 2:length(sheet_names)){
+    
+    input_file <- readxl::read_xlsx(paste0("Data-input/", file_name), sheet=s, skip=2)
+    
+    wasp [s-1] <- input_file  %>% filter(Parameter=="crop yield") %>% pull(Value) %>% as.numeric
+    
+    df[i,7] <- mean(wasp)
+    
+    casp [s-1]   <- input_file %>% filter(Parameter=="area") %>% pull(Value) %>% as.numeric
+    
+    df[i,5] <- sum(casp)
+    
+    sand_content [s-1] <- input_file  %>% filter(Parameter=="sand content") %>% pull(Value) %>% as.numeric
+    
+    df[i,3] <- mean(sand_content)
+    
+    clay_content [s-1] <- input_file  %>% filter(Parameter=="clay content") %>% pull(Value) %>% as.numeric
+    
+    df[i,4] <- mean(clay_content)
+    
+    fertilizer_amount <- vector()
+    
+    for(fert in 1:10){
+      
+      if(is.na(input_file %>% filter(Parameter==paste0("nitrogen fertilizer type ",fert)) %>%
+               pull(Value))==TRUE)break
+      
+      fertilizer_amount[fert]<- input_file  %>% filter(Parameter == paste0("fertilization rate of type ",fert))  %>%
+        pull("Value") %>% as.numeric 
+      pasp[s-1]<-sum(fertilizer_amount)
+    }
+    
+    df[i,6] <- mean(pasp)
+  }
+  region <- c()
+  region[i] <- input_file  %>% filter(Parameter=="main crop") %>% pull(Comment) %>% as.character
+  df[i,2] <- region[i]
+}
+
+df_means <- df %>% group_by(Region) %>% 
+  summarise("Sand (%)"=mean(Sand), "Clay (%)"= mean(Clay), 
+            "Fertilizer Amount (kg-N/ha)"= mean(`Fertilizer Amount`), 
+            "Yield (t/ha)" =mean(Yield))
+
+df_area <- df %>% group_by(Region) %>% 
+  summarise(`Total Area`= sum(`Total Area`)) 
+
+df_new <- cbind(df_means, "Total Area (ha)" = df_area$`Total Area`)
+df_new <- format(df_new, digits = 1, nsmall = 1)
+
+
+gt(df_new) %>% tab_style(style =   cell_text(color="#195079"), 
+                         locations = list(cells_body(columns =everything(), rows=everything()),cells_column_labels(columns=everything()))) %>% tab_options(table_body.hlines.color ="#195079")
+```
+
+## Overview of Reference Scenario Conditions for Each Region
+
+::: {layout-nrow="2"}
+```{r}
+allfiles <- list.files("Data-input")
+
+df <- data.frame(matrix(nrow=length(allfiles), ncol=7))
+
+names(df) <- c("Grower", "Region", "Sand", "Clay","Total Area" ,"Fertilizer Amount", "Yield")
+
+for (i in 1:length(allfiles)){
+  
+  file_name <- allfiles[i]
+  
+  sheet_names <- excel_sheets(paste0("Data-input/", file_name))
+  
+  unlist_filename <- unlist(strsplit(file_name, "_"))[4]
+  
+  df[i,1] <- strsplit(unlist_filename,".xlsx")
+
+  wasp <- vector()
+  casp <- vector()
+  pasp <- vector()
+  sand_content <- vector()
+  clay_content <- vector()
+  
+  for(s in 2:length(sheet_names)){
+    
+    input_file <- readxl::read_xlsx(paste0("Data-input/", file_name), sheet=s, skip=2)
+    
+    wasp [s-1] <- input_file  %>% filter(Parameter=="crop yield") %>% pull(Value) %>% as.numeric
+    
+    df[i,7] <- mean(wasp)
+    
+    casp [s-1]   <- input_file %>% filter(Parameter=="area") %>% pull(Value) %>% as.numeric
+    
+    df[i,5] <- sum(casp)
+    
+    sand_content [s-1] <- input_file  %>% filter(Parameter=="sand content") %>% pull(Value) %>% as.numeric
+    
+    df[i,3] <- mean(sand_content)
+    
+    clay_content [s-1] <- input_file  %>% filter(Parameter=="clay content") %>% pull(Value) %>% as.numeric
+    
+    df[i,4] <- mean(clay_content)
+    
+    fertilizer_amount <- vector()
+    
+    for(fert in 1:10){
+      
+      if(is.na(input_file %>% filter(Parameter==paste0("nitrogen fertilizer type ",fert)) %>%
+               pull(Value))==TRUE)break
+      
+      fertilizer_amount[fert]<- input_file  %>% filter(Parameter == paste0("fertilization rate of type ",fert))  %>%
+        pull("Value") %>% as.numeric 
+      pasp[s-1]<-sum(fertilizer_amount)
+    }
+    
+    df[i,6] <- mean(pasp)
+  }
+  region <- c()
+  region[i] <- input_file  %>% filter(Parameter=="main crop") %>% pull(Comment) %>% as.character
+  df[i,2] <- region[i]
+}
+
+df_means <- df %>% group_by(Region) %>% 
+  summarise("Sand (%)"=mean(Sand), "Clay (%)"= mean(Clay), 
+            "Fertilizer Amount (kg-N/ha)"= mean(`Fertilizer Amount`), 
+            "Yield (t/ha)" =mean(Yield))
+
+df_area <- df %>% group_by(Region) %>% 
+  summarise(`Total Area`= sum(`Total Area`)) 
+
+df_new <- cbind(df_means, "Total Area (ha)" = df_area$`Total Area`)
+df_new <- format(df_new, digits = 1, nsmall = 1)
+
+
+gt(df_new) %>% tab_style(style =   cell_text(color="#195079"), 
+                         locations = list(cells_body(columns =everything(), rows=everything()),cells_column_labels(columns=everything()))) %>% tab_options(table_body.hlines.color ="#195079")
+```
+
+```{r}
+#| label: regions-overview
+#| layout-ncol: 3
+
+#----------------------------------------------------soil properties-------------------------------------------
+
+data_plot <- df_new %>% select(Region,`Sand (%)`,`Clay (%)`)
+
+data_long <- pivot_longer(data_plot, cols= c(`Sand (%)`,`Clay (%)`), names_to = "Variable", values_to = "Value")
+
+data_long_new <- mutate(data_long, Region=as.character(Region), Value=as.numeric(Value))
+
+ggplot(data_long_new, aes(x = Region, y = Value, fill = Variable)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label=signif(Value,4),fontface=2), position=position_stack(vjust=0.5), size=6, col="white")+
+  labs(title = "Sand and Clay Content for Each Region",
+       x = "Regions",
+       y = "Sand and Clay Content (%)") +
+  theme_minimal()+
+  scale_fill_manual(name = "Soil Properties",
+                  values = c("Sand (%)"="#8C510A", "Clay (%)"="#01665E"))+
+  theme(strip.background =element_rect(fill="#195079"))+
+  theme(strip.text = element_text(colour = 'white'))+
+  theme(legend.text = element_text(colour="#195079",size=14, face="bold"))+
+  theme(legend.title = element_text(colour="#195079",size=14, face="bold"))+
+  theme(axis.title = element_text(colour = "#195079" ))+
+  theme(axis.ticks = element_line(colour = "#195079" ))+
+  theme(axis.text = element_text(colour = "#195079" ))+
+  theme(axis.text.x = element_text(hjust=1, size=14, face="bold", angle = 45))+
+  theme(axis.text.y = element_text(hjust=1, size=14, face="bold"))+
+  theme(axis.title.x =element_blank())+
+  theme(axis.title.y = element_text(size=14, face="bold"))+
+  theme(plot.title = element_text(colour="#195079", size=16, face="bold"))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+#--------------------------------------------------------Fertilizer Efficiency-------------------------------
+
+data_plot_fert <- df_new %>% select(Region,`Fertilizer Amount (kg-N/ha)`,`Yield (t/ha)`) %>% 
+  mutate(Region=as.character(Region), `Fertilizer Amount (kg-N/ha)`=as.numeric(`Fertilizer Amount (kg-N/ha)`),
+         `Yield (t/ha)`=as.numeric(`Yield (t/ha)`))
+
+data_plot_fert$`Yield (kg/ha)` <- data_plot_fert$`Yield (t/ha)`*1000
+data_plot_fert$`Fertilizer Efficiency (kg-yield/ kg-N)`<- data_plot_fert$`Yield (kg/ha)`/data_plot_fert$`Fertilizer Amount (kg-N/ha)`
+
+
+ggplot(data_plot_fert, aes(x = Region, y = `Fertilizer Efficiency (kg-yield/ kg-N)`, fill = Region)) +
+  geom_bar(stat="identity") +
+  guides(fill = "none") +
+  geom_text(aes(label=signif(`Fertilizer Efficiency (kg-yield/ kg-N)`,3),fontface=2), position=position_stack(vjust=0.5), size=6, col="white")+
+scale_fill_manual(values = c("Kujawsko-pomorskie" = "#195079", "Pomorskie" = "#195079", "Warminsko-mazurskie" = "#195079", "Wielkopolskie" = "#195079",  "Zachodnio-pomorskie"="#195079"))+
+labs(title = "Yield Efficiency for Each Region",
+     x = "Regions",
+     y = "Yield Efficiency (kg-yield/ kg-N)") +
+  theme_bw()+
+  theme(axis.title = element_text(colour = "#195079")) +
+  theme(axis.ticks = element_line(colour = "#195079")) +
+  theme(axis.text = element_text(colour = "#195079")) +
+  theme(axis.text.x = element_text(hjust=1, size=16, face="bold", angle = 45, colour = "#195079")) +
+  theme(axis.text.y = element_text(hjust=1, size=16, face="bold",colour = "#195079")) +
+  theme(axis.title.x =element_blank())+
+  theme(axis.title.y = element_text(size=16, face="bold",colour = "#195079")) +
+  theme(plot.title = element_text(colour="#195079", size=18, face="bold")) +
+  theme(plot.title = element_text(hjust = 0.5,colour = "#195079" ))
+  
+# -------------------------------------------------------Total Area of Each Region----------------
+data_plot_area <- df_new %>% select(Region,`Total Area (ha)`) %>% 
+  mutate(Region=as.character(Region), `Total Area (ha)`=as.numeric(`Total Area (ha)`))
+
+ggplot(data_plot_area, aes(x = "", y = `Total Area (ha)`, fill = Region)) +
+  geom_col(col="white")+
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0) +
+  guides(fill = guide_legend(title = "Regions"))+
+  geom_text(aes(label=signif(`Total Area (ha)`,3),fontface=2), position=position_stack(vjust=0.5), size=6, col="white")+
+  scale_fill_manual(values=c("#8C510A", "#003C30","#DFC27D","#01665E","#80CDC1"))+
+  theme_void() +
+  theme(axis.title = element_text(colour = "#195079")) +
+  theme(axis.ticks = element_line(colour = "#195079")) +
+  theme(axis.text = element_text(colour = "#195079")) +
+  theme(axis.text.x = element_blank()) +
+  theme(axis.text.y = element_text(hjust=1, size=16, face="bold",colour = "#195079")) +
+  theme(plot.title = element_text(colour="#195079", size=18, face="bold")) +
+  theme(plot.title = element_text(hjust = 0.5,colour = "#195079" )) 
+```
+:::
+
+## Current Adoption Rates
+
+```{r}
+#| label: current-practices
+#| layout-ncol: 2
+
+# -----------------------------------------------------CC_vs_NonCC---------------------------------
+
+regions <- c("Kujawsko-pomorskie", "Pomorskie", "Warminsko-mazurskie", "Wielkopolskie", "Zachodnio-pomorskie")
+CC_area <- c(74, 90, 165, 116, 0)
+nonCC_area <- c(76, 252, 754, 810, 880)
+df_CC <- data.frame (Regions=regions, CoverCroppedArea=CC_area, NotCoveredArea=nonCC_area)
+df_long_CC <- pivot_longer(df_CC, cols= c( CoverCroppedArea, NotCoveredArea ), 
+                          names_to = "Variable", values_to = "Value")
+ggplot(df_long_CC, aes(x = Regions, y = Value, fill = Variable)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label=signif(Value,6),fontface=2), position=position_stack(vjust=0.5), size=6, col="white")+
+  labs(title = "Cover Cropped Areas for Each Region",
+       x = "Regions",
+       y = "Area (ha)") +
+  theme_minimal()+
+  scale_fill_manual(name = "",
+                    values = c("NotCoveredArea"="#8C510A", "CoverCroppedArea"="#01665E"))+
+  theme(strip.background =element_rect(fill="#195079"))+
+  theme(strip.text = element_text(colour = 'white'))+
+  theme(legend.text = element_text(colour="#195079",size=14, face="bold"))+
+  theme(legend.title = element_text(colour="#195079",size=14, face="bold"))+
+  theme(axis.title = element_text(colour = "#195079" ))+
+  theme(axis.ticks = element_line(colour = "#195079" ))+
+  theme(axis.text = element_text(colour = "#195079" ))+
+  theme(axis.text.x = element_text(hjust=1, size=14, face="bold", angle = 45))+
+  theme(axis.text.y = element_text(hjust=1, size=14, face="bold"))+
+  theme(axis.title.x =element_blank())+
+  theme(axis.title.y = element_text(size=14, face="bold"))+
+  theme(plot.title = element_text(colour="#195079", size=16, face="bold"))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+# -------------------------------------Percentages Cover Cropped Area ---------------------------
+
+regions <- c("Kujawsko-pomorskie", "Pomorskie", "Warminsko-mazurskie", "Wielkopolskie", "Zachodnio-pomorskie")
+CC_percentage <- c(74/(74+76), 90/(90+252), 165/(165+754), 116/(116+810), 0/(0+880))
+nonCC_percentage <- c(76/(74+76), 252/(90+252), 754/(165+754), 810/(116+810), 880/(0+880))
+df_CC_percentage <- data.frame (Regions=regions, CoverCroppedPercentage=CC_percentage, NotCoveredPercentage=nonCC_percentage)
+df_long_CC_percentage <- pivot_longer(df_CC_percentage, cols= c(CoverCroppedPercentage, NotCoveredPercentage),names_to = "Variable", values_to = "Value")
+
+df_long_CC_percentage$Value <- df_long_CC_percentage$Value*100
+
+ggplot(df_long_CC_percentage, aes(x = Regions, y = Value, fill = Variable)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label=signif(Value,2),fontface=2), position=position_stack(vjust=0.5), size=6, col="white")+
+  labs(title = "Percentage of Cover Cropping for Each Region",
+       x = "Regions",
+       y = "Percentage(%)") +
+  theme_minimal()+
+  scale_fill_manual(name = "",
+                    values = c("NotCoveredPercentage"="#B42E34", "CoverCroppedPercentage"="#1F82C0"))+
+  theme(strip.background =element_rect(fill="#195079"))+
+  theme(strip.text = element_text(colour = 'white'))+
+  theme(legend.text = element_text(colour="#195079",size=14, face="bold"))+
+  theme(legend.title = element_text(colour="#195079",size=14, face="bold"))+
+  theme(axis.title = element_text(colour = "#195079" ))+
+  theme(axis.ticks = element_line(colour = "#195079" ))+
+  theme(axis.text = element_text(colour = "#195079" ))+
+  theme(axis.text.x = element_text(hjust=1, size=14, face="bold", angle = 45))+
+  theme(axis.text.y = element_text(hjust=1, size=14, face="bold"))+
+  theme(axis.title.x =element_blank())+
+  theme(axis.title.y = element_text(size=14, face="bold"))+
+  theme(plot.title = element_text(colour="#195079", size=16, face="bold"))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+# --------------------------------------------------------Till-vs-NoTill---------------------------
+
+regions <- c("Kujawsko-pomorskie", "Pomorskie", "Warminsko-mazurskie", "Wielkopolskie", "Zachodnio-pomorskie")
+fulltill_area <- c(0, 100, 0, 221, 189)
+notill_area <- c(150, 221, 642, 656, 691)
+reducedtill_area <- c(0, 21, 277, 49, 0)
+
+df_till <- data.frame (Regions=regions, FullTillArea=fulltill_area, NoTillArea=notill_area, ReducedTillArea=reducedtill_area)
+df_long_till <- pivot_longer(df_till, cols= c( FullTillArea, NoTillArea, ReducedTillArea ), 
+                             names_to = "Variable", values_to = "Value")
+ggplot(df_long_till, aes(x = Regions, y = Value, fill = Variable)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label=ifelse(Value>=10|Value<=-10,round(Value,0),"")), fontface=2, position=position_stack(vjust=0.5), size=6, col="white")+
+  labs(title = "Tilled vs. No-Tilled Area for Each Region",
+       x = "Regions",
+       y = "Area (ha)") +
+  theme_minimal()+
+  scale_fill_manual(name = "",
+                    values = c("FullTillArea"="#B42E34", "NoTillArea"="#97BF0D","ReducedTillArea"="#195079"))+
+  theme(strip.background =element_rect(fill="#195079"))+
+  theme(strip.text = element_text(colour = 'white'))+
+  theme(legend.text = element_text(colour="#195079",size=14, face="bold"))+
+  theme(legend.title = element_text(colour="#195079",size=14, face="bold"))+
+  theme(axis.title = element_text(colour = "#195079" ))+
+  theme(axis.ticks = element_line(colour = "#195079" ))+
+  theme(axis.text = element_text(colour = "#195079" ))+
+  theme(axis.text.x = element_text(hjust=1, size=14, face="bold", angle = 45))+
+  theme(axis.text.y = element_text(hjust=1, size=14, face="bold"))+
+  theme(axis.title.x =element_blank())+
+  theme(axis.title.y = element_text(size=14, face="bold"))+
+  theme(plot.title = element_text(colour="#195079", size=16, face="bold"))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+# -------------------------------------Percentages No-Till Area ---------------------------
+regions <- c("Kujawsko-pomorskie", "Pomorskie", "Warminsko-mazurskie", "Wielkopolskie", "Zachodnio-pomorskie")
+fulltill_Percentage <- c(0/(0+150), 100/(121+221), 0/(277+642), 221/(270+656), 189/(189+691))
+notill_Percentage <- c(150/(0+150), 221/(121+221), 642/(277+642), 656/(270+656), 691/(189+691))
+reducedtill_Percentage <- c(0/(0+150), 21/(121+221), 277/(277+642), 49/(270+656), 0/(189+691))
+
+df_till_Percentage <- data.frame (Regions = regions, FullTillPercentage = fulltill_Percentage, 
+                                  NoTillPercentage = notill_Percentage, ReducedTillPercentage = reducedtill_Percentage)
+df_long_till_Percentage <- pivot_longer(df_till_Percentage, cols= c( FullTillPercentage, NoTillPercentage, ReducedTillPercentage), 
+                                        names_to = "Variable", values_to = "Value")
+df_long_till_Percentage$Value <- df_long_till_Percentage$Value*100
+ggplot(df_long_till_Percentage, aes(x = Regions, y = Value, fill = Variable)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label=ifelse(Value>=1|Value<=-1,round(Value,0),"")), position=position_stack(vjust=0.5), size=6, col="white")+
+  labs(title = "Tilled vs. No-Tilled Percentages for Each Region",
+       x = "Regions",
+       y = "Percentage(%)") +
+  theme_minimal()+
+  scale_fill_manual(name = "",
+                    values = c("FullTillPercentage"="#8C510A" , "NoTillPercentage"="#80CDC1","ReducedTillPercentage"="#DFC27D"))+
+  theme(strip.background =element_rect(fill="#195079"))+
+  theme(strip.text = element_text(colour = 'white'))+
+  theme(legend.text = element_text(colour="#195079",size=14, face="bold"))+
+  theme(legend.title = element_text(colour="#195079",size=14, face="bold"))+
+  theme(axis.title = element_text(colour = "#195079" ))+
+  theme(axis.ticks = element_line(colour = "#195079" ))+
+  theme(axis.text = element_text(colour = "#195079" ))+
+  theme(axis.text.x = element_text(hjust=1, size=14, face="bold", angle = 45))+
+  theme(axis.text.y = element_text(hjust=1, size=14, face="bold"))+
+  theme(axis.title.x =element_blank())+
+  theme(axis.title.y = element_text(size=14, face="bold"))+
+  theme(plot.title = element_text(colour="#195079", size=16, face="bold"))+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Overall Result Reference and Project Scenario Emissions
+
+::: columns
+::: {.column width="50%"}
+```{r}
+#| label: overall
+input_plot <- read_csv2("Results-perFarm-Masterfile_Poland.csv", 
+                        col_names = c("intervention","scenario","variable","value","grower","region", "field"))
+
+data_plot <- input_plot %>% group_by(intervention,scenario,region) %>% summarise(value=sum(value)) # %>% filter(grower == names(grower.select)) # intervention,scenario,variable,grower,product
+
+data_plot_agg<-aggregate(value~intervention+scenario,data_plot,FUN = sum)
+
+print(
+  ggplot(data_plot_agg %>% filter(value != 0)#  %>% filter(scenario == "baseline")
+         ,aes(x = factor(scenario, level=c( "reference", "project")),y = value, fill = intervention)) +  # , fill = grower
+    # scale_y_continuous(minor_breaks = seq(-1,100,0.1))+
+    # scale_y_continuous(breaks = c(-0.5, -0.25, 0 ,0.25, 0.50, 0.75, 1,1.25,1.5))+
+    geom_bar(stat = "identity") +
+    # facet_wrap(~ intervention, ncol =6) +
+    geom_text(aes(label=signif(value,4),fontface=2), position=position_stack(vjust=0.5), size=4, col="white")+
+    
+    labs(title = paste0("Case Study Overview for all Regions"),   #,names(grower.select)),
+         x = "interventions", y = expression(t~CO[2]*eq/yr)) +
+    theme_bw() +
+    scale_fill_manual(name = "Interventions",
+                      values = c("Tillage"="#8C510A", "Cover Crops"="#003C30",
+                                 "Crop Specific"="#DFC27D","N Fertilization"="#01665E", "Crop Protection"="#80CDC1"))  +
+    theme(strip.background =element_rect(fill="#195079"))+
+    theme(strip.text = element_text(colour = 'white'))+
+    theme(legend.text = element_text(colour="#195079",size=14, face="bold"))+
+    theme(legend.title = element_text(colour="#195079",size=14, face="bold"))+
+    theme(axis.title = element_text(colour = "#195079" ))+
+    theme(axis.ticks = element_line(colour = "#195079" ))+
+    theme(panel.border = element_rect(colour = "#195079" ))+
+    theme(axis.text = element_text(colour = "#195079" ))+
+    theme(axis.text.x = element_text(hjust=1, size=16, face="bold"))+
+    theme(axis.text.y = element_text(hjust=1, size=16, face="bold"))+
+    theme(axis.title.x =element_blank())+
+    theme(axis.title.y = element_text(size=20, face="bold"))+
+    theme(panel.grid.major = element_line(size = 0.05, linetype = 1,
+                                          colour = "#D2E6F2"))+
+    theme(panel.grid.minor = element_line(size = 0.05, linetype = 1,
+                                          colour = "#D2E6F2"))+
+    theme(plot.title = element_text(colour="#195079", size=18, face="bold"))+
+    geom_hline(yintercept=0, colour = "#195079",linewidth = 0.5 ) +
+    theme(plot.title = element_text(hjust = 0.5))
+) # close print()
+```
+:::
+
+::: {.column width="50%"}
+```{r}
+input_plot <- read_csv2("Results-perFarm-Masterfile_Poland.csv", 
+                        col_names = c("intervention","scenario","variable","value","farm","region","field"))
+
+# input_plot <- read_csv2("Ireland/Results-perYield-Masterfile_Ireland_20230818.csv", 
+#                         col_names = c("intervention","scenario","variable","value","farm","region"))
+data_plot <- input_plot %>% 
+  
+  group_by(intervention,variable,scenario) %>% summarise(value=sum(value)) # %>% filter(grower == names(grower.select)) # intervention,scenario,variable,grower,product
+
+#data_plot_agg<-aggregate(value~variable+farm+region,data_plot,FUN = sum)
+
+print(
+  ggplot(data_plot %>% filter(value != 0)  #  %>% filter(scenario == "baseline")
+         #  %>% filter(grower == names(grower.select)) %>% filter(product == product.select)
+         ,aes(x = factor(scenario, level=c( "reference", "project")), y = value, fill = variable)) +  # , fill = grower
+    #scale_y_continuous(minor_breaks = seq(-1,100,0.1))+
+    #scale_y_continuous(breaks = c( -0.5, 0 , 0.5,  1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8., 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12, 12.5, 13,13.5,14,14.5,15,15.5,16,16.5,17,17.5,18,18.5,19,19.5,20))+
+    facet_wrap(~ intervention, ncol =5)+
+    geom_bar(stat = "identity") +
+    geom_text(aes(label=ifelse(value>=150|value<=-150,round(value,0),"")), position=position_stack(vjust=0.5), size=4, col="white", fontface=2)+
+    
+    labs(title = paste0("Case Study Overview per Intervention"),   #,names(farm.select)),
+         x = "farms", y = expression(t~CO[2]*eq/yr)) +
+    scale_fill_discrete(name = "emission sources",
+                        labels = c("input production", "machinery","N2O","SOC"))+
+    scale_fill_manual(name = "Emission Sources",
+                      values = c("Input Production"="#195079", "Machinery"="#1F82C0",
+                                 "Nitrous Oxide"="#97BF0D","Soil Organic Carbon"="#B42E34"))  +
+    theme_bw() +
+    theme(strip.background =element_rect(fill="#195079"))+
+    theme(strip.text = element_text(colour = 'white', size=14, face="bold"))+
+    theme(legend.text = element_text(colour="#195079", size=14 ))+
+    theme(legend.title = element_text(colour="#195079",  size=14 ))+
+    theme(axis.title = element_text(colour = "#195079" , size=16 ))+
+    theme(axis.ticks = element_line(colour = "#195079" ))+
+    theme(panel.border = element_rect(colour = "#195079" ))+
+    theme(axis.text = element_text(colour = "#195079", size=14 ))+
+    theme(axis.text.x = element_text(angle = 45, hjust=1))+
+    theme(axis.title.x =element_blank())+
+    theme(panel.grid.major = element_line(size = 0.05, linetype = 1,
+                                          colour = "#D2E6F2"))+
+    theme(panel.grid.minor = element_line(size = 0.05, linetype = 1,
+                                          colour = "#D2E6F2"))+
+    theme(plot.title = element_text(colour="#195079", size=18, face="bold"))+
+    geom_hline(yintercept=0, colour = "#195079",linewidth = 0.5 ) +
+    theme(plot.title = element_text(hjust = 0.5))
+) # close print()
+
+```
+:::
+:::
+
+## Project Scenario Interventions {style="\"font-size:20px;"}
+
+::: {.fragment fragment-index="1"}
+::: {layout="[50, 50]"}
+::: {#first-column}
+::: {style="text-align: left; font-size:17px;"}
+<h2>Employed Interventions:</h2>
+
+-   **Kujawsko-pomorskie:**
+    -   add Cover Crop between the Winter Wheat and the Rapeseed
+    -   decrease the fertilization rate at 165 kg of Nitrogen
+    -   push a lot to Precision Farming
+-   **Pomorskie:**
+    -   add Cover Crop after the Winter Wheat
+    -   decrease the fertilization rate at 165 kg of Nitrogen
+    -   add Legume in the rotation *(WinterWheat--CoverCrop--Legume--Rapeseed)*
+-   **Warminsko-mazurskie:**
+    -   change the rotation: *WinterWheat--CoverCrop--Corn--CoverCrop--Rapeseed*
+    -   decrease the fertilization rate at 165 kg of Nitrogen
+-   **Wielkopolskie:**
+    -   add Cover Crop between the Winter Wheat and the Rapeseed
+    -   decrease the fertilization rate at 165 kg of Nitrogen
+    -   left the residue on the field
+-   **Zachodnio-pomorskie:**
+    -   add Cover Crop between the Winter Wheat and the Rapeseed
+    -   decrease the fertilization rate at 165 kg of Nitrogen
+:::
+:::
+
+::: {#second-column}
+::: {style="text-align: right; font-size:16px;"}
+<h2>Further Interventions on N Fertilization:</h2>
+
+-   use Nitrification Inhibitors
+-   switch to Ammonium based from Urea
+-   switch application strategy from broadcasting to precision app.
+:::
+:::
+:::
+:::
+
+::: {.fragment fragment-index="4"}
+![](referencevsproject.png){.absolute top="200" right="-200" width="658"}
+:::
+
+## Emission Reductions for Each Region
+
+```{r}
+#|label: EmissionsReductions
+#| fig-align: center
+#| out-height: 503px
+#| out-width: 1258px
+#| output-location: fragment
+
+input_plot <- read_csv2("Results-perHa-Masterfile_Poland.csv", 
+                          col_names = c("intervention","scenario","variable","value","grower","region","field"))
+data_plot <- input_plot %>% group_by(intervention,scenario,variable,grower,region) %>% summarise(value=mean(value)) # %>% filter(farm == names(farm.select)) # intervention,scenario,variable,farm,region
+data_plot_agg<-aggregate(value~variable+scenario+region,data_plot,FUN = sum)
+reduction <- data_plot_agg %>% filter(scenario == "reference") 
+reduction$value <-  -(data_plot_agg %>% filter(scenario == "project") %>% pull(value)- 
+                        data_plot_agg %>% filter(scenario == "reference") %>% pull(value))
+reduction$scenario <- "reduction"
+data_plot_agg <- rbind(data_plot_agg, reduction)
+print(
+  ggplot(data_plot_agg %>% filter(value != 0) %>% filter(scenario == "reduction")
+         #  %>% filter(farm == names(farm.select)) %>% filter(region == region.select)
+         ,aes(x = variable, y = value, fill = variable)) +  # , fill = variablehttp://127.0.0.1:10829/graphics/plot_zoom_png?width=1920&height=1009
+    scale_y_continuous(minor_breaks = seq(-1,100,0.1))+
+    scale_y_continuous(breaks = c(-0.5, 0, 0.5, 1, 1.5, 2, 2.5 , 3 , 3.5 , 4 , 4.5 , 5 , 5.5 , 6 , 6.5 , 7 , 7.5))+
+    geom_bar(stat = "identity") +
+    facet_wrap(~ region, ncol =5) +
+    geom_text(aes(label=ifelse(value>=0.01|value<=-0.01,round(value,1),"")), position=position_stack(vjust=0.5), size=4, col="white", fontface=2)+
+    labs(title = paste0("Emission Reductions by Emission Source and Farm for Each Region"),   #,names(farm.select)),
+         x = "emission sources", y = expression(t~CO[2]*eq/ha/yr)) +
+    scale_fill_discrete(name = "emission sources",
+                        labels = c("input production", "machinery","N2O","SOC"))+
+    scale_fill_manual(name = "emission sources",
+                      values = c("Input Production"="#195079", "Machinery"="#1F82C0",
+                                 "Nitrous Oxide"="#97BF0D","Soil Organic Carbon"="#B42E34"))  +
+    theme_bw() +
+    theme(strip.background =element_rect(fill="#195079"))+
+    theme(strip.text = element_text(colour = 'white', size=8, face="bold"))+
+    theme(legend.text = element_text(colour="#195079", size=12))+
+    theme(legend.title = element_text(colour="#195079", size=12))+
+    theme(axis.title = element_text(colour = "#195079" , size=14))+
+    theme(axis.ticks = element_line(colour = "#195079" ))+
+    theme(panel.border = element_rect(colour = "#195079" ))+
+    theme(axis.text = element_text(colour = "#195079", size=12 ))+
+    theme(axis.text.x = element_text(angle = 45, hjust=1, size=12))+
+    theme(axis.title.x =element_blank())+
+    theme(panel.grid.major = element_line(size = 0.05, linetype = 1,
+                                          colour = "#D2E6F2"))+
+    theme(panel.grid.minor = element_line(size = 0.05, linetype = 1,
+                                          colour = "#D2E6F2"))+
+    theme(plot.title = element_text(colour="#195079", size=18, face="bold"))+
+    geom_hline(yintercept=0, colour = "#195079",linewidth = 0.5 ) +
+    theme(plot.title = element_text(hjust = 0.5))
+) # close print()
+```
+
+## Current practices
+
+::: {layout-ncol="3"}
+![Kujawsko-pomorskie](Kujawsko-pomorskie-table.png)
+
+![Zachodnio-pomorskie](Zachodnio-pomorskie-table.png)
+
+![Pomorskie](Pomorskie-table.png)
+
+![Wielkopolskie](Wielkopolskie-table.png)
+
+![Warminsko-mazurskie](Warminsko-mazurskie-table.png)
+:::
+
+# Thank you! {background-image="bayer.jpg"}

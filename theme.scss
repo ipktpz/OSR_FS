@@ -1,0 +1,50 @@
+/*-- scss:defaults --*/
+
+// fonts
+$font-family-sans-serif: "Palatino Linotype", "Book Antiqua", Palatino,
+  FreeSerif, serif !default;
+
+// colors
+$body-bg: white !default;
+$body-color: #195079 !default;
+$link-color: #97BF0D !default;
+$selection-bg: #97BF0D !default;
+
+// headings
+$presentation-heading-font: "Palatino Linotype", "Book Antiqua", Palatino,
+  FreeSerif, serif !default;
+$presentation-heading-color: #195079  !default;
+$heading1Size: 2.00em;
+$heading2Size: 1.11em;
+$heading3Size: 0.55em;
+$heading4Size: 0.10em;
+
+// Vertical spacing between blocks of text
+$blockMargin: 10px;
+
+/*-- scss:rules --*/
+
+.reveal a {
+  line-height: 1.3em;
+}
+
+.reveal .title {
+  color: white;
+}
+
+.reveal .subtitle {
+  color: white;
+}
+
+.quarto-title-author {
+    color: #ffffff;
+  }
+  
+.reveal h1 {
+  color: #ffffff;
+
+}
+
+ .reveal .h {
+  color: #195079;
+} 
