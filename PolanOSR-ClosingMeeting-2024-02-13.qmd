@@ -8,6 +8,7 @@ logo: "https://upload.wikimedia.org/wikipedia/commons/f/f7/Logo_Bayer.svg"
 footer: Feasibility Study for Carbon Farming Practices of OSR in Poland by Bayer Crop Science
 format: 
   revealjs:
+    self-contained: true
     theme: theme.scss
     incremental: true
     chalkboard: true
