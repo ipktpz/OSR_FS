@@ -9,9 +9,8 @@ footer: Feasibility Study for Carbon Farming Practices of OSR in Poland by Bayer
 format: 
   revealjs:
     self-contained: true
-    theme: theme.scss
+    theme: styles.scss
     incremental: true
-    chalkboard: true
 editor: visual
 title-slide-attributes: 
   data-background-image: bayer.jpg

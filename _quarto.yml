@@ -1,0 +1,18 @@
+---
+title: "Poland’s OSR Feasibility Study Regions’ Overview"
+subtitle: "Comparisons of the Results of each Region from the first Level 2 Feasibility Assessment following the Bayer’s Shelf Product"
+author: Bayer Crop Science
+date: today
+slide-number: c/t
+logo: "https://upload.wikimedia.org/wikipedia/commons/f/f7/Logo_Bayer.svg"
+footer: Feasibility Study for Carbon Farming Practices of OSR in Poland by Bayer Crop Science
+format:
+  revealjs:
+    self-contained: true
+    theme: styles.scss
+    incremental: true
+editor: visual
+title-slide-attributes:
+  data-background-image: bayer.jpg
+  data-background-size: cover
+---
